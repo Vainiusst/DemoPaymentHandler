@@ -1,27 +1,22 @@
 package com.paymentHandler.demoPaymentHandler;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paymentHandler.enums.CaseResolution;
-import com.paymentHandler.enums.CaseType;
 import com.paymentHandler.models.Case;
+import com.paymentHandler.models.CaseCollection;
 import com.paymentHandler.models.Payment;
+import com.paymentHandler.models.PaymentCollection;
 import com.paymentHandler.services.Generators;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 public class Controllers {
-    private List<Case> unresolvedCases = new ArrayList<>();
+    private CaseCollection unresolvedCases = new CaseCollection();
+    private final CaseCollection resolvedCases = new CaseCollection();
     private final Generators generators = new Generators();
-    private final List<Case> resolvedCases = new ArrayList<>();
-    private final List<Payment> assignedPayments = generators.getAssignedPayments();
-    private final ObjectMapper objMapper = new ObjectMapper();
+    private final PaymentCollection assignedPayments = generators.getAssignedPayments();
 
     @RequestMapping("/")
     public String index() {
@@ -41,25 +36,7 @@ public class Controllers {
 
     @RequestMapping("getGeneralInfo")
     public String getGeneralInfo() {
-        int norwayCases = unresolvedCases.stream().filter(c -> c.caseType == CaseType.NORWAY).toList().size();
-        int denmarkCases = unresolvedCases.stream().filter(c -> c.caseType == CaseType.DENMARK).toList().size();
-        int swedenCases = unresolvedCases.stream().filter(c -> c.caseType == CaseType.SWEDEN).toList().size();
-        int finlandCases = unresolvedCases.stream().filter(c -> c.caseType == CaseType.FINLAND).toList().size();
-        List<Integer> unresolvedIds = unresolvedCases.stream().map(Case::getCaseId).collect(Collectors.toList());
-
-        StringBuilder sb = new StringBuilder(String.format("{\"UnresolvedCases\": \"%s\",", unresolvedCases.size()));
-        sb.append(String.format("\"NorwayCases\": \"%s\",", norwayCases));
-        sb.append(String.format("\"DenmarkCases\": \"%s\",", denmarkCases));
-        sb.append(String.format("\"SwedenCases\": \"%s\",", swedenCases));
-        sb.append(String.format("\"FinlandCases\": \"%s\",", finlandCases));
-        sb.append("\"UnresolvedIds\": ");
-        if (unresolvedIds.size() > 0) {
-            String unresolvedString = unresolvedIds.toString();
-            sb.append(String.format("\"%s\",", unresolvedString));
-        }
-        else {
-            sb.append("\"none\",");
-        }
+        StringBuilder sb = new StringBuilder(unresolvedCases.getInfo());
         sb.append(String.format("\"ResolvedCases\": \"%s\"}", resolvedCases.size()));
         return sb.toString();
     }
@@ -68,67 +45,40 @@ public class Controllers {
     public String createCases(@PathVariable("qty") int qty) {
         int casesBefore = unresolvedCases.size();
         try {
-            generators.generatePayments(qty);
-            unresolvedCases = generators.generateCases();
+            unresolvedCases = generators.newCases(qty);
         } catch (Exception e) {
             return String.format("{\"message\": \"Generators have failed\", \"error\": \"%s\"", e.getMessage());
         }
-        int casesAfter = unresolvedCases.size();
-        int diff = casesAfter - casesBefore;
-        String message = String.format("%s cases were created, out of %s attempted", diff, qty);
-        return jsonifyString(message);
+        int diff = unresolvedCases.size() - casesBefore;
+        return jsonifyString(String.format("%s cases were created, out of %s attempted", diff, qty));
     }
 
     @RequestMapping("getCase/{caseId}")
     public String getCase(@PathVariable("caseId") int caseId){
-        Case myCase = unresolvedCases.stream().filter(c -> c.caseId == caseId).findFirst().orElse(null);
+        Case myCase = unresolvedCases.findCaseById(caseId);
         if (myCase == null) return jsonifyString("No such case found");
-        String caseJson = "";
-        try {
-            caseJson = objMapper.writeValueAsString(myCase);
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-        }
-        return caseJson;
+        return myCase.toJson();
     }
 
     @RequestMapping("getPayment/{paymentId}")
     public String getPayment(@PathVariable("paymentId") int paymentId) {
-        Payment myPayment = assignedPayments.stream()
-                .filter(c -> c.paymentId == paymentId).findFirst().orElse(null);
+        Payment myPayment = assignedPayments.findPaymentByPaymentId(paymentId);
         if (myPayment == null) return jsonifyString("No such payment found");
-        String paymentJson = "";
-        try {
-            paymentJson = objMapper.writeValueAsString(myPayment);
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-        }
-        return paymentJson;
+        return myPayment.toJson();
     }
 
     @RequestMapping("rejectCase/{caseId}")
     public String rejectCase(@PathVariable("caseId") int caseId) {
-        Case myCase = unresolvedCases.stream()
-                .filter(c -> c.caseId == caseId).findFirst().orElse(null);
-        if (myCase == null) return "No such case found.";
-
-        myCase.setCaseResolution(CaseResolution.REJECTED);
-        resolvedCases.add(myCase);
-        unresolvedCases.remove(myCase);
-        String message = String.format("Case %s was rejected.", caseId);
-        return jsonifyString(message);
+        Case myCase = unresolvedCases.findCaseById(caseId);
+        if (myCase == null) return jsonifyString("No such case found.");
+        return jsonifyString(myCase.resolve(CaseResolution.REJECTED, unresolvedCases, resolvedCases));
     }
 
     @RequestMapping("acceptCase/{caseId}")
     public String acceptCase(@PathVariable("caseId") int caseId) {
-        Case myCase = unresolvedCases.stream().filter(c -> c.caseId == caseId).findFirst().orElse(null);
-        if (myCase == null) return "No such case found.";
-
-        myCase.setCaseResolution(CaseResolution.ACCEPTED);
-        resolvedCases.add(myCase);
-        unresolvedCases.remove(myCase);
-        String message = String.format("Case %s was accepted.", caseId);
-        return jsonifyString(message);
+        Case myCase = unresolvedCases.findCaseById(caseId);
+        if (myCase == null) return jsonifyString("No such case found.");
+        return jsonifyString(myCase.resolve(CaseResolution.ACCEPTED, unresolvedCases, resolvedCases));
     }
 
     private String jsonifyString(String message) { return String.format("{\"message\": \"%s\"}", message); }
