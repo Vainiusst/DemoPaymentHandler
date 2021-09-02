@@ -1,5 +1,6 @@
 package com.paymentHandler.demoPaymentHandler;
 
+import com.paymentHandler.services.Helpers;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,13 +9,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 class DemoPaymentHandlerApplicationTests {
 
 	private final Controllers controllers = new Controllers();
+	private final Helpers helpers = new Helpers();
 
 	@Test
 	void indexReturns() {
 		try {
 			JSONObject json = new JSONObject(controllers.index());
 			int actual = json.length();
-			int expected = controllers.getNumberOfRoutes() - 1; //-1 because index does not contain description of itself
+			int expected = helpers.getNumberOfRoutes() - 1; //-1 because index does not contain description of itself
 			assert actual == expected;
 		} catch (Exception e) {
 			assert false;

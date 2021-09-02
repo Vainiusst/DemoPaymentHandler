@@ -6,10 +6,8 @@ import com.paymentHandler.models.CaseCollection;
 import com.paymentHandler.models.Payment;
 import com.paymentHandler.models.PaymentCollection;
 import com.paymentHandler.services.Generators;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import java.lang.reflect.Method;
+import com.paymentHandler.services.Helpers;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class Controllers {
@@ -17,8 +15,9 @@ public class Controllers {
     private final CaseCollection resolvedCases = new CaseCollection();
     private final Generators generators = new Generators();
     private final PaymentCollection assignedPayments = generators.getAssignedPayments();
+    private final Helpers helpers = new Helpers();
 
-    @RequestMapping("/")
+    @RequestMapping(value = "/", method = RequestMethod.GET)
     public String index() {
         StringBuilder sb = new StringBuilder("{\"/getGeneralInfo\": \"find general info about cases\",");
         sb.append("\"/createCases/{num}\": \"create randomized number of cases.");
@@ -34,60 +33,47 @@ public class Controllers {
         return sb.toString();
     }
 
-    @RequestMapping("getGeneralInfo")
+    @RequestMapping(value = "generalInfo", method = RequestMethod.GET)
     public String getGeneralInfo() {
         StringBuilder sb = new StringBuilder(unresolvedCases.getInfo());
         sb.append(String.format("\"ResolvedCases\": \"%s\"}", resolvedCases.size()));
         return sb.toString();
     }
 
-    @RequestMapping("createCases/{qty}")
+    @RequestMapping(value = "createCases/{qty}", method = RequestMethod.POST)
     public String createCases(@PathVariable("qty") int qty) {
         int casesBefore = unresolvedCases.size();
-        try {
-            unresolvedCases = generators.newCases(qty);
-        } catch (Exception e) {
-            return String.format("{\"message\": \"Generators have failed\", \"error\": \"%s\"", e.getMessage());
-        }
+        unresolvedCases.addCollection(generators.newCases(qty));
         int diff = unresolvedCases.size() - casesBefore;
-        return jsonifyString(String.format("%s cases were created, out of %s attempted", diff, qty));
+        return helpers.jsonifyString(String.format("%s cases were created, out of %s attempted", diff, qty));
     }
 
-    @RequestMapping("getCase/{caseId}")
+    @RequestMapping(value = "cases/{caseId}", method = RequestMethod.GET)
     public String getCase(@PathVariable("caseId") int caseId){
         Case myCase = unresolvedCases.findCaseById(caseId);
-        if (myCase == null) return jsonifyString("No such case found");
+        if (myCase == null) myCase = resolvedCases.findCaseById(caseId);
+        if (myCase == null) return helpers.jsonifyString("No such payment found");
         return myCase.toJson();
     }
 
-    @RequestMapping("getPayment/{paymentId}")
+    @RequestMapping(value = "payments/{paymentId}", method = RequestMethod.GET)
     public String getPayment(@PathVariable("paymentId") int paymentId) {
         Payment myPayment = assignedPayments.findPaymentByPaymentId(paymentId);
-        if (myPayment == null) return jsonifyString("No such payment found");
+        if (myPayment == null) return helpers.jsonifyString("No such payment found");
         return myPayment.toJson();
     }
 
-    @RequestMapping("rejectCase/{caseId}")
+    @RequestMapping(value = "rejectCase/{caseId}", method = RequestMethod.PUT)
     public String rejectCase(@PathVariable("caseId") int caseId) {
         Case myCase = unresolvedCases.findCaseById(caseId);
-        if (myCase == null) return jsonifyString("No such case found.");
-        return jsonifyString(myCase.resolve(CaseResolution.REJECTED, unresolvedCases, resolvedCases));
+        if (myCase == null) return helpers.jsonifyString("No such case found.");
+        return helpers.jsonifyString(myCase.resolve(CaseResolution.REJECTED, unresolvedCases, resolvedCases));
     }
 
-    @RequestMapping("acceptCase/{caseId}")
+    @RequestMapping(value = "acceptCase/{caseId}", method = RequestMethod.PUT)
     public String acceptCase(@PathVariable("caseId") int caseId) {
         Case myCase = unresolvedCases.findCaseById(caseId);
-        if (myCase == null) return jsonifyString("No such case found.");
-        return jsonifyString(myCase.resolve(CaseResolution.ACCEPTED, unresolvedCases, resolvedCases));
-    }
-
-    private String jsonifyString(String message) { return String.format("{\"message\": \"%s\"}", message); }
-
-    public int getNumberOfRoutes() {
-        int result = 0;
-        for (Method m : Controllers.class.getMethods()) {
-            if (m.isAnnotationPresent(RequestMapping.class)) result++;
-        }
-        return result;
+        if (myCase == null) return helpers.jsonifyString("No such case found.");
+        return helpers.jsonifyString(myCase.resolve(CaseResolution.ACCEPTED, unresolvedCases, resolvedCases));
     }
 }

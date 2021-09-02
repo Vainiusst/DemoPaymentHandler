@@ -15,6 +15,11 @@ public class CaseCollection {
 
     public void addToCollection(Case c) { this.cases.add(c); }
 
+    public CaseCollection addCollection(CaseCollection cc){
+        this.cases.addAll(cc.cases);
+        return this;
+    }
+
     public Case findCaseById(int caseId) {
         return this.cases.stream().filter(c -> c.caseId == caseId).findFirst().orElse(null);
     }
