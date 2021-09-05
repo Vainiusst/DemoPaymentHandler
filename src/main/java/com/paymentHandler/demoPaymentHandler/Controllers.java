@@ -19,12 +19,12 @@ public class Controllers {
 
     @RequestMapping(value = "/", method = RequestMethod.GET)
     public String index() {
-        StringBuilder sb = new StringBuilder("{\"/getGeneralInfo\": \"find general info about cases\",");
+        StringBuilder sb = new StringBuilder("{\"/generalInfo\": \"find general info about cases\",");
         sb.append("\"/createCases/{num}\": \"create randomized number of cases.");
         sb.append(" {num} specifies the number of cases you want to create\",");
-        sb.append("\"/getCase/{caseId}\": \"gets information related to the case and the associated payment.");
+        sb.append("\"/cases/{caseId}\": \"gets information related to the case and the associated payment.");
         sb.append(" {caseId} specifies the id of the case\",");
-        sb.append("\"/getPayment/{paymentId}\": \"gets information related to the case and the associated payment.");
+        sb.append("\"/payments/{paymentId}\": \"gets information related to the case and the associated payment.");
         sb.append(" {paymentId} specifies the id of the payment\",");
         sb.append("\"/rejectCase/{caseId}\": \"rejects the case.");
         sb.append(" {caseId} specifies the id of the case\",");
